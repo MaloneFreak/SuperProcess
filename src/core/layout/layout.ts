@@ -14,6 +14,12 @@
  * bottom corners, the way a careful modeller draws them. Parallel line
  * segments in a channel are spread over separate tracks.
  *
+ * External partners are collapsed pools above and below the process. Each one
+ * spans only the stretch it exchanges messages with; they are spread over the
+ * two sides and over rows so that a message flow does not have to run through
+ * a pool that is not its own, and message labels pick the free side of their
+ * line.
+ *
  * The result is plain geometry (boxes, polylines, text blocks) that every
  * exporter consumes unchanged, which is what keeps the Visio, BPMN, draw.io
  * and image outputs identical.
@@ -69,6 +75,11 @@ export interface BandLayout extends Box {
   /** Width of the rotated title strip on the left (0 for collapsed pools). */
   headerWidth: number;
   labelLines: string[];
+  /**
+   * Collapsed pools only: how far the name sits from the middle of the band,
+   * so that it clears a message flow that has to cross the band.
+   */
+  labelOffset?: number;
 }
 
 export interface DiagramLayout {
@@ -608,26 +619,11 @@ export function layoutProcess(model: ProcessModel): DiagramLayout {
     row.h = Math.max(M.rowMin, Math.ceil(extent * 2 + 12));
   }
 
-  // External pools go above or below, whichever side their partners are on.
   const rowsFlat = allRows();
-  const above: { id: string; name: string }[] = [];
-  const belowExt: { id: string; name: string }[] = [];
-  const externalSide = new Map<string, 'above' | 'below'>();
-  model.externals.forEach((ext) => {
-    const partners = model.messageFlows
-      .filter((m) => m.from === ext.id || m.to === ext.id)
-      .map((m) => byId.get(m.from === ext.id ? m.to : m.from))
-      .filter((n): n is LNode => !!n);
-    const position =
-      partners.length > 0 && rowsFlat.length > 1
-        ? partners.reduce((sum, n) => sum + rowsFlat.indexOf(n.row), 0) / partners.length / (rowsFlat.length - 1)
-        : 0;
-    const side = position > 0.5 ? 'below' : 'above';
-    externalSide.set(ext.id, side);
-    (side === 'above' ? above : belowExt).push(ext);
-  });
 
-  const poolTop = M.margin + above.length * (M.externalHeight + M.externalGap);
+  // The pool starts at the top margin for now. It moves down once the external
+  // pools above it are placed, which needs the horizontal geometry first.
+  let poolTop = M.margin;
   let cursorY = poolTop;
   const laneBoxes: { y: number; h: number }[] = [];
   laneRows.forEach((rows) => {
@@ -638,7 +634,7 @@ export function layoutProcess(model: ProcessModel): DiagramLayout {
     }
     laneBoxes.push({ y: top, h: cursorY - top });
   });
-  const poolBottom = cursorY;
+  let poolBottom = cursorY;
   for (const n of lnodes) {
     n.y = n.row.y + (n.row.h - n.h) / 2;
     for (const b of n.boundary) b.cy = n.y + n.h;
@@ -809,6 +805,344 @@ export function layoutProcess(model: ProcessModel): DiagramLayout {
     seg.x = channelLeft(seg.channel) + (channelWidth.get(seg.channel)! * (seg.track + 1)) / (count + 1);
   }
 
+  // ── External pools ──────────────────────────────────────────────────────
+  // Each one spans only the stretch it exchanges messages with. Pools that do
+  // not overlap share a row and narrow ones sit nearest the process, so that a
+  // message flow rarely has to run through a pool that is not its own.
+  const round = (value: number): number => Math.round(value * 100) / 100;
+  const poolX = M.margin;
+  const poolWidth = Math.max(contentRight - poolX, 420);
+  const externalLabel = (name: string, width: number): string[] =>
+    wrapText(name, { fontSize: M.bandFont, maxWidth: Math.max(40, width - 24), maxLines: 3, bold: true });
+
+  interface ExternalPlan {
+    ext: { id: string; name: string };
+    side: 'above' | 'below';
+    flows: MessagePlan[];
+    lo: number;
+    hi: number;
+    /** 0 is the row next to the process. */
+    row: number;
+    labelOffset: number;
+    /** Set when the name has to squeeze in beside a flow that crosses the pool. */
+    labelLines?: string[];
+  }
+  interface MessagePlan {
+    message: ProcessModel['messageFlows'][number];
+    n: LNode;
+    band: ExternalPlan;
+    outbound: boolean;
+    up: boolean;
+    /** Where the line leaves or enters the step. */
+    x: number;
+    /** Where it meets the external pool. */
+    attachX: number;
+    /** Another step is in the way: the line sidesteps into the channel. */
+    blocked: boolean;
+    /** Which of the sidestep levels beside the step this flow turns on. */
+    level: number;
+  }
+
+  const externalPlans = new Map<string, ExternalPlan>();
+  for (const ext of model.externals) {
+    externalPlans.set(ext.id, {
+      ext,
+      side: 'above',
+      flows: [],
+      lo: poolX,
+      hi: poolX + poolWidth,
+      row: 0,
+      labelOffset: 0,
+    });
+  }
+  const bands = [...externalPlans.values()];
+  const blockedOn = (n: LNode, up: boolean): boolean => {
+    const at = rowsFlat.indexOf(n.row);
+    return (up ? rowsFlat.slice(0, at) : rowsFlat.slice(at + 1)).some((row) => row.cells.get(n.col)?.startsWith('n:'));
+  };
+  /** The steps a pool exchanges messages with, one entry per message flow. */
+  const partnerSteps = new Map(
+    bands.map((band) => [
+      band,
+      model.messageFlows
+        .filter((message) => message.from === band.ext.id || message.to === band.ext.id)
+        .map((message) => byId.get(message.from === band.ext.id ? message.to : message.from))
+        .filter((n): n is LNode => !!n),
+    ]),
+  );
+  /** The same as positions along the process. */
+  const partners = new Map(bands.map((band) => [band, partnerSteps.get(band)!.map((n) => n.x + n.w / 2)]));
+  // Two pools whose message flows alternate along the process cannot both stay
+  // clear of each other on the same side.
+  const alternate = (a: number[], b: number[]): boolean => {
+    const within = (xs: number[], others: number[]): boolean => {
+      const lo = Math.min(...others);
+      const hi = Math.max(...others);
+      return xs.some((x) => x > lo && x < hi);
+    };
+    return a.length > 0 && b.length > 0 && within(a, b) && within(b, a);
+  };
+
+  // Above or below the process? Each pool would like the side its partners are
+  // nearer to. But two pools that alternate belong on opposite sides, a step
+  // should not carry more than two message flows on one side, and a flow should
+  // not have to sidestep another step. With a handful of pools every
+  // combination can be tried; the first pool listed stays on top when it can.
+  const sideCost = (above: boolean[]): number => {
+    let cost = 0;
+    const perStep = new Map<string, number>();
+    bands.forEach((band, i) => {
+      const steps = partnerSteps.get(band)!;
+      if (steps.length > 0 && rowsFlat.length > 1) {
+        const position = steps.reduce((sum, n) => sum + rowsFlat.indexOf(n.row), 0) / steps.length / (rowsFlat.length - 1);
+        cost += 5 * (above[i] ? position : 1 - position);
+      }
+      if (!above[i]) cost += 0.01 * (bands.length - i);
+      for (const n of steps) {
+        if (blockedOn(n, above[i])) cost += 10;
+        const key = `${n.node.id}:${above[i]}`;
+        perStep.set(key, (perStep.get(key) ?? 0) + 1);
+      }
+      for (let j = 0; j < i; j++) {
+        if (above[i] !== above[j]) continue;
+        const other = bands[j];
+        if (alternate(partners.get(band)!, partners.get(other)!)) cost += 1000;
+        if (steps.some((n) => partnerSteps.get(other)!.includes(n))) cost += 2;
+      }
+    });
+    for (const count of perStep.values()) cost += 100 * Math.max(0, count - 2);
+    return cost;
+  };
+  let sidesAbove = bands.map((band) => {
+    const steps = partnerSteps.get(band)!;
+    if (steps.length === 0 || rowsFlat.length < 2) return true;
+    return steps.reduce((sum, n) => sum + rowsFlat.indexOf(n.row), 0) / steps.length / (rowsFlat.length - 1) <= 0.5;
+  });
+  if (bands.length <= 8) {
+    let best = sideCost(sidesAbove);
+    for (let mask = 0; mask < 1 << bands.length; mask++) {
+      const candidate = bands.map((_, i) => (mask & (1 << i)) === 0);
+      const score = sideCost(candidate);
+      if (score < best) {
+        best = score;
+        sidesAbove = candidate;
+      }
+    }
+  }
+  bands.forEach((band, i) => {
+    band.side = sidesAbove[i] ? 'above' : 'below';
+  });
+
+  const messagePlans: MessagePlan[] = [];
+  for (const message of model.messageFlows) {
+    const outbound = byId.has(message.from);
+    const n = byId.get(outbound ? message.from : message.to);
+    const band = externalPlans.get(outbound ? message.to : message.from);
+    if (!n || !band) continue;
+    const up = band.side === 'above';
+    const plan: MessagePlan = { message, n, band, outbound, up, x: 0, attachX: 0, blocked: blockedOn(n, up), level: 0 };
+    band.flows.push(plan);
+    messagePlans.push(plan);
+  }
+
+  // Flows that share a side of a step spread over its width, so that no two of
+  // them run on the same line. A pool that reaches to the left of the step gets
+  // the left of it and one that reaches to the right the right, with the wider
+  // pool (which ends up further out) on the inside: that way its flow passes
+  // beside the narrower pool instead of through it.
+  const sharing = new Map<string, MessagePlan[]>();
+  for (const plan of messagePlans) {
+    const key = `${plan.n.node.id}:${plan.up ? 'up' : 'down'}`;
+    sharing.set(key, [...(sharing.get(key) ?? []), plan]);
+  }
+  for (const group of sharing.values()) {
+    const n = group[0].n;
+    const centre = n.x + n.w / 2;
+    const reach = (plan: MessagePlan): { side: number; width: number } => {
+      const xs = partners.get(plan.band)!;
+      const lo = Math.min(...xs);
+      const hi = Math.max(...xs);
+      // A pool with this step as its only partner is the narrowest of all: it
+      // goes to the outside, like a pool that reaches no further than here.
+      const side = hi - lo < 1 ? 2 : hi <= centre + 0.5 ? -1 : lo >= centre - 0.5 ? 1 : 0;
+      return { side, width: hi - lo };
+    };
+    group.sort((a, b) => {
+      const ra = reach(a);
+      const rb = reach(b);
+      if (ra.side !== rb.side) return ra.side - rb.side;
+      if (ra.width !== rb.width) {
+        if (ra.side === -1) return ra.width - rb.width;
+        if (ra.side === 1) return rb.width - ra.width;
+      }
+      return Number(b.outbound) - Number(a.outbound);
+    });
+    const activity = isActivity(n.node.type);
+    if (group.length === 1) {
+      group[0].x = round(centre + (activity ? (group[0].outbound ? -18 : 18) : 0));
+    } else {
+      const step = activity ? Math.min(36, 84 / (group.length - 1)) : Math.min(16, 20 / (group.length - 1));
+      group.forEach((plan, i) => {
+        plan.x = round(centre + (i - (group.length - 1) / 2) * step);
+      });
+    }
+    // Blocked flows turn on separate levels: the rightmost one furthest from the step.
+    group
+      .filter((plan) => plan.blocked)
+      .sort((a, b) => b.x - a.x)
+      .forEach((plan, i) => {
+        plan.level = Math.min(i, 2);
+      });
+  }
+
+  // A blocked flow runs along the channel before its column. Each gets a line
+  // of its own there, clear of the sequence flows that use the channel. Flows
+  // from steps nearer their pool take the lines nearer the column, which keeps
+  // the sidesteps from crossing one another.
+  const sidesteps = new Map<number, number[]>();
+  const blockedPlans = messagePlans
+    .filter((plan) => plan.blocked)
+    .sort((a, b) => {
+      if (a.n.col !== b.n.col) return a.n.col - b.n.col;
+      if (a.up !== b.up) return a.up ? -1 : 1;
+      const rowA = rowsFlat.indexOf(a.n.row);
+      const rowB = rowsFlat.indexOf(b.n.row);
+      if (rowA !== rowB) return a.up ? rowA - rowB : rowB - rowA;
+      return b.x - a.x;
+    });
+  for (const plan of blockedPlans) {
+    const channel = plan.n.col - 1;
+    const taken = sidesteps.get(channel) ?? [];
+    const tracks = vsegs.filter((seg) => seg.channel === channel).map((seg) => seg.x);
+    const leftmost = channelLeft(channel) + 6;
+    const first = colX[plan.n.col] - 12;
+    let x = first;
+    while (x >= leftmost && (tracks.some((t) => Math.abs(t - x) < 7) || taken.some((t) => Math.abs(t - x) < 8))) x -= 2;
+    // No free line left in the channel: share one rather than leave it.
+    if (x < leftmost) x = Math.max(leftmost, first - 8 * taken.length);
+    taken.push(x);
+    sidesteps.set(channel, taken);
+    plan.attachX = round(x);
+  }
+  for (const plan of messagePlans) if (!plan.blocked) plan.attachX = plan.x;
+
+  const EXT_PAD = 44; // from the outermost message flow to the edge of the pool
+  const EXT_PAD_MIN = 16; // the same where a neighbour needs the room
+  const EXT_GAP = 24; // between two pools in the same row
+  const EXT_CLEAR = 10; // between a pool and a flow that passes beside it
+  for (const band of bands) {
+    if (band.flows.length === 0) continue; // nothing to line up with: full width
+    const xs = band.flows.map((flow) => flow.attachX);
+    const nameWidth = Math.ceil(blockWidth([band.ext.name], M.bandFont, true));
+    const minWidth = Math.min(260, Math.max(168, nameWidth + 40));
+    let lo = Math.min(...xs) - EXT_PAD;
+    let hi = Math.max(...xs) + EXT_PAD;
+    if (hi - lo < minWidth) {
+      const centre = (lo + hi) / 2;
+      lo = centre - minWidth / 2;
+      hi = centre + minWidth / 2;
+    }
+    if (lo < poolX) {
+      hi += poolX - lo;
+      lo = poolX;
+    }
+    if (hi > poolX + poolWidth) {
+      lo -= hi - (poolX + poolWidth);
+      hi = poolX + poolWidth;
+    }
+    band.lo = Math.round(Math.max(poolX, lo));
+    band.hi = Math.round(hi);
+  }
+
+  const externalRows = { above: 0, below: 0 };
+  for (const side of ['above', 'below'] as const) {
+    const rows: ExternalPlan[][] = [];
+    const ordered = bands
+      .filter((band) => band.side === side)
+      .sort(
+        (a, b) =>
+          Number(a.flows.length === 0) - Number(b.flows.length === 0) || a.hi - a.lo - (b.hi - b.lo) || a.lo - b.lo,
+      );
+    for (const band of ordered) {
+      let r = rows.findIndex((row) =>
+        row.every((other) => band.hi + EXT_GAP <= other.lo || other.hi + EXT_GAP <= band.lo),
+      );
+      if (r < 0) r = rows.push([]) - 1;
+      rows[r].push(band);
+      band.row = r;
+    }
+    externalRows[side] = rows.length;
+  }
+
+  // A flow to a pool further out passes the rows before it. Where it would
+  // clip the padding of a nearer pool, that pool gives way.
+  const passing = (band: ExternalPlan): number[] =>
+    messagePlans
+      .filter((flow) => flow.band !== band && flow.band.side === band.side && flow.band.row > band.row)
+      .map((flow) => flow.attachX);
+  for (const band of bands) {
+    if (band.flows.length === 0) continue;
+    const xs = band.flows.map((flow) => flow.attachX);
+    const coreLo = Math.min(...xs) - EXT_PAD_MIN;
+    const coreHi = Math.max(...xs) + EXT_PAD_MIN;
+    let lo = band.lo;
+    let hi = band.hi;
+    for (const x of passing(band)) {
+      if (x >= coreHi + EXT_CLEAR) hi = Math.min(hi, x - EXT_CLEAR);
+      else if (x <= coreLo - EXT_CLEAR) lo = Math.max(lo, x + EXT_CLEAR);
+    }
+    if (hi - lo >= 96) {
+      band.lo = Math.round(lo);
+      band.hi = Math.round(hi);
+    }
+  }
+  // A flow that still crosses a pool must at least not strike through its name:
+  // the name moves into a gap between the crossing lines, wrapped tighter if
+  // that is what it takes.
+  for (const band of bands) {
+    const crossing = passing(band)
+      .filter((x) => x > band.lo && x < band.hi)
+      .sort((a, b) => a - b);
+    if (crossing.length === 0) continue;
+    const centre = (band.lo + band.hi) / 2;
+    const stops = [band.lo + 4, ...crossing, band.hi - 4];
+    const place = (lines: string[]): number | null => {
+      const half = blockWidth(lines, M.bandFont, true) / 2 + 8;
+      let best: number | null = null;
+      for (let i = 0; i < stops.length - 1; i++) {
+        const from = stops[i] + half;
+        const to = stops[i + 1] - half;
+        if (from > to) continue;
+        const candidate = Math.min(to, Math.max(from, centre));
+        if (best === null || Math.abs(candidate - centre) < Math.abs(best - centre)) best = candidate;
+      }
+      return best;
+    };
+    let best = place(externalLabel(band.ext.name, band.hi - band.lo));
+    if (best === null) {
+      const widest = Math.max(...stops.slice(1).map((stop, i) => stop - stops[i]));
+      if (widest >= 60) {
+        band.labelLines = wrapText(band.ext.name, { fontSize: M.bandFont, maxWidth: widest - 20, maxLines: 3, bold: true });
+        best = place(band.labelLines);
+      }
+    }
+    if (best !== null) band.labelOffset = Math.round(best - centre);
+  }
+
+  // Now the pool can move down to make room for the rows above it.
+  const externalPitch = M.externalHeight + M.externalGap;
+  const shiftY = externalRows.above * externalPitch;
+  if (shiftY > 0) {
+    for (const row of allRows()) row.y += shiftY;
+    for (const n of lnodes) {
+      n.y += shiftY;
+      for (const b of n.boundary) b.cy += shiftY;
+    }
+    for (const box of laneBoxes) box.y += shiftY;
+    poolTop += shiftY;
+    poolBottom += shiftY;
+  }
+
   const resolveX = (spec: XSpec): number => {
     switch (spec.t) {
       case 'left':
@@ -844,7 +1178,6 @@ export function layoutProcess(model: ProcessModel): DiagramLayout {
     }
     return out;
   };
-  const round = (value: number): number => Math.round(value * 100) / 100;
   const textBlock = (lines: string[], x: number, y: number, anchor: Anchor, bold = false): TextBlock => ({
     lines,
     x: round(x),
@@ -947,8 +1280,6 @@ export function layoutProcess(model: ProcessModel): DiagramLayout {
   }
 
   // ── Pool, lanes, external pools ─────────────────────────────────────────
-  const poolX = M.margin;
-  const poolWidth = Math.max(contentRight - poolX, 420);
   const bandLabel = (name: string, length: number): string[] =>
     wrapText(name, { fontSize: M.bandFont, maxWidth: Math.max(40, length - 16), maxLines: 2, bold: true });
 
@@ -975,73 +1306,175 @@ export function layoutProcess(model: ProcessModel): DiagramLayout {
 
   const externals: BandLayout[] = [];
   const externalBox = new Map<string, BandLayout>();
-  const addExternal = (ext: { id: string; name: string }, y: number): void => {
+  for (const ext of model.externals) {
+    const plan = externalPlans.get(ext.id)!;
+    const width = plan.hi - plan.lo;
     const band: BandLayout = {
       id: ext.id,
       name: ext.name,
-      x: poolX,
-      y,
-      width: poolWidth,
+      x: plan.lo,
+      y:
+        plan.side === 'above'
+          ? poolTop - (plan.row + 1) * externalPitch
+          : poolBottom + M.externalGap + plan.row * externalPitch,
+      width,
       height: M.externalHeight,
       headerWidth: 0,
-      labelLines: wrapText(ext.name, { fontSize: M.bandFont, maxWidth: poolWidth - 40, maxLines: 2, bold: true }),
+      labelLines: plan.labelLines ?? externalLabel(ext.name, width),
     };
+    if (plan.labelOffset !== 0) band.labelOffset = plan.labelOffset;
     externals.push(band);
     externalBox.set(ext.id, band);
-  };
-  above.forEach((ext, i) => addExternal(ext, M.margin + i * (M.externalHeight + M.externalGap)));
-  belowExt.forEach((ext, i) =>
-    addExternal(ext, poolBottom + M.externalGap + i * (M.externalHeight + M.externalGap)),
-  );
+  }
 
   // ── Message flows ───────────────────────────────────────────────────────
-  for (const message of model.messageFlows) {
-    const outbound = byId.has(message.from);
-    const n = byId.get(outbound ? message.from : message.to);
-    const band = externalBox.get(outbound ? message.to : message.from);
-    if (!n || !band) continue;
-    const up = externalSide.get(band.id) === 'above';
-    const offset = isActivity(n.node.type) ? (outbound ? -18 : 18) : 0;
-    const x = round(n.x + n.w / 2 + offset);
-    const nodeY = up ? n.y : n.y + n.h;
-    const bandY = up ? band.y + band.height : band.y;
-
-    const rows = allRows();
-    const at = rows.indexOf(n.row);
-    const blocked = (up ? rows.slice(0, at) : rows.slice(at + 1)).some((row) =>
-      row.cells.get(n.col)?.startsWith('n:'),
+  // A label sits beside its line, just outside the external pool, in the gap
+  // between its line and the next one. Per strip (the space between one row of
+  // pools and the next) the labels pick their sides together, so that as few of
+  // them as possible have to be wrapped tighter to fit.
+  const canvasRight = poolX + poolWidth + M.margin;
+  const LABEL_GAP = 9; // between a line and its label: clear of the arrowhead
+  const messageLabel = new Map<MessagePlan, TextBlock>();
+  const strips = new Map<string, MessagePlan[]>();
+  for (const plan of messagePlans) {
+    if (!plan.message.label) continue;
+    const key = `${plan.band.side}:${plan.band.row}`;
+    strips.set(key, [...(strips.get(key) ?? []), plan]);
+  }
+  for (const labelled of strips.values()) {
+    labelled.sort((a, b) => a.attachX - b.attachX);
+    const { side, row } = labelled[0].band;
+    // Every message flow that runs through this strip, pools further out included.
+    const lines = [
+      ...new Set(
+        messagePlans.filter((plan) => plan.band.side === side && plan.band.row >= row).map((plan) => plan.attachX),
+      ),
+    ].sort((a, b) => a - b);
+    const xs = labelled.map((plan) => plan.attachX);
+    const texts = labelled.map((plan) =>
+      wrapText(plan.message.label, { fontSize: M.labelFont, maxWidth: 120, maxLines: 2 }),
     );
+    const widths = texts.map((text) => Math.ceil(blockWidth(text, M.labelFont)));
+    // Below the width of its longest word a label has to break words.
+    const wordWidths = labelled.map((plan, i) =>
+      Math.min(
+        widths[i],
+        Math.ceil(Math.max(...plan.message.label.split(/\s+/).map((word) => measureText(word, M.labelFont)))),
+      ),
+    );
+    const nextLine = (x: number): number | undefined => lines.find((line) => line > x);
+    // How far a label may reach on either side of its line.
+    const rightLimit = xs.map((x) => (nextLine(x) ?? canvasRight + 1) - 5);
+    const leftLimit = xs.map((x) => ([...lines].reverse().find((line) => line < x) ?? -1) + 5);
+    // Two labels meet in one gap when the left line's goes right and the right line's goes left.
+    const meets = (i: number, right: boolean[]): boolean =>
+      i + 1 < xs.length && right[i] && !right[i + 1] && nextLine(xs[i]) === xs[i + 1];
+    /** The width each label may take; where two meet they share the gap by need. */
+    const allot = (right: boolean[]): number[] => {
+      const allowed = xs.map((x, i) => (right[i] ? rightLimit[i] - (x + LABEL_GAP) : x - LABEL_GAP - leftLimit[i]));
+      for (let i = 0; i < xs.length; i++) {
+        if (!meets(i, right)) continue;
+        const j = i + 1;
+        const room = xs[j] - xs[i] - 2 * LABEL_GAP - 6;
+        if (widths[i] + widths[j] <= room) continue;
+        const least = wordWidths[i] + wordWidths[j];
+        let share: number;
+        if (least <= room) {
+          const spare = widths[i] - wordWidths[i] + (widths[j] - wordWidths[j]);
+          share = wordWidths[i] + (spare > 0 ? ((room - least) * (widths[i] - wordWidths[i])) / spare : (room - least) / 2);
+        } else {
+          share = (room * wordWidths[i]) / least;
+        }
+        allowed[i] = Math.min(allowed[i], Math.floor(share));
+        allowed[j] = Math.min(allowed[j], Math.floor(room - share));
+      }
+      return allowed;
+    };
+    const fit = (i: number, width: number): string[] =>
+      width >= widths[i]
+        ? texts[i]
+        : wrapText(labelled[i].message.label, { fontSize: M.labelFont, maxWidth: width, maxLines: 3 });
+    /** 0 when every label fits as it is; overlapping a neighbour costs most. */
+    const cost = (right: boolean[]): number => {
+      const allowed = allot(right);
+      let total = 0;
+      for (let i = 0; i < xs.length; i++) {
+        if (!right[i]) total += 0.001;
+        if (allowed[i] >= widths[i]) continue;
+        if (allowed[i] < 30) total += 100;
+        else if (allowed[i] < wordWidths[i] || fit(i, allowed[i]).at(-1)?.endsWith('…')) total += 10;
+        else total += 1;
+      }
+      return total;
+    };
+    let sides = xs.map(() => true);
+    if (xs.length <= 8) {
+      let best = cost(sides);
+      for (let mask = 1; mask < 1 << xs.length && best > 0; mask++) {
+        const candidate = xs.map((_, i) => (mask & (1 << i)) === 0);
+        const score = cost(candidate);
+        if (score < best) {
+          best = score;
+          sides = candidate;
+        }
+      }
+    } else {
+      // Too many to try every combination: each takes the side with more room.
+      sides = xs.map((x, i) => rightLimit[i] - (x + LABEL_GAP) >= x - LABEL_GAP - leftLimit[i]);
+    }
+
+    const allowed = allot(sides);
+    labelled.forEach((plan, i) => {
+      // Less than a short word of room: the label overlaps its neighbour rather
+      // than vanish. It must still stay on the drawing.
+      const text = allowed[i] >= 30 ? fit(i, allowed[i]) : texts[i];
+      const width = Math.ceil(blockWidth(text, M.labelFont));
+      let right = sides[i];
+      if (right && xs[i] + LABEL_GAP + width > canvasRight - 4) right = false;
+      else if (!right && xs[i] - LABEL_GAP - width < 4) right = true;
+      const box = externalBox.get(plan.band.ext.id)!;
+      const edgeY = plan.up ? box.y + box.height : box.y;
+      const gap = text.length > 2 ? 4 : 8;
+      const top = plan.up ? edgeY + gap : edgeY - gap - text.length * M.labelLine;
+      messageLabel.set(plan, textBlock(text, right ? xs[i] + LABEL_GAP : xs[i] - LABEL_GAP, top, right ? 'start' : 'end'));
+    });
+  }
+
+  for (const plan of messagePlans) {
+    const { n, up, x } = plan;
+    const box = externalBox.get(plan.band.ext.id)!;
+    const nodeY = round(up ? n.y : n.y + n.h);
+    const bandY = round(up ? box.y + box.height : box.y);
     let points: Point[];
-    if (!blocked) {
+    if (!plan.blocked) {
       points = [
-        { x, y: round(nodeY) },
-        { x, y: round(bandY) },
+        { x, y: nodeY },
+        { x, y: bandY },
       ];
     } else {
       // Step sideways into the channel so the line does not cross a shape.
-      const stripY = round(up ? n.row.y + 7 : n.row.y + n.row.h - 7);
-      const sideX = round(colX[n.col] - 12);
+      const inset = 6 + plan.level * 5;
+      const stripY = round(up ? n.row.y + inset : n.row.y + n.row.h - inset);
       points = [
-        { x, y: round(nodeY) },
+        { x, y: nodeY },
         { x, y: stripY },
-        { x: sideX, y: stripY },
-        { x: sideX, y: round(bandY) },
+        { x: plan.attachX, y: stripY },
+        { x: plan.attachX, y: bandY },
       ];
     }
-    if (!outbound) points.reverse();
-
-    let label: TextBlock | null = null;
-    if (message.label) {
-      const lines = wrapText(message.label, { fontSize: M.labelFont, maxWidth: 120, maxLines: 2 });
-      const end = up ? bandY + 8 : bandY - 8 - lines.length * M.labelLine;
-      const anchorX = points[outbound ? points.length - 1 : 0].x + 6;
-      label = textBlock(lines, anchorX, end, 'start');
-    }
-    edges.push({ id: message.id, kind: 'message', from: message.from, to: message.to, points, label, isDefault: false });
+    if (!plan.outbound) points.reverse();
+    edges.push({
+      id: plan.message.id,
+      kind: 'message',
+      from: plan.message.from,
+      to: plan.message.to,
+      points,
+      label: messageLabel.get(plan) ?? null,
+      isDefault: false,
+    });
   }
 
-  const bottom =
-    belowExt.length > 0 ? poolBottom + belowExt.length * (M.externalHeight + M.externalGap) : poolBottom;
+  const bottom = poolBottom + externalRows.below * externalPitch;
   return {
     width: Math.ceil(poolX + poolWidth + M.margin),
     height: Math.ceil(bottom + M.margin),

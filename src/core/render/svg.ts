@@ -9,6 +9,7 @@
  */
 import type { BandLayout, DiagramLayout, EdgeLayout, Point, TextBlock } from '../layout/layout';
 import { METRICS } from '../layout/layout';
+import { blockWidth } from '../layout/text';
 import type { ProcessModel, ProcessNode } from '../model/types';
 import { nodeGraphics, nodeRole, type Prim } from './graphics';
 import type { DiagramTheme, Palette } from './theme';
@@ -240,20 +241,26 @@ export function renderSvg(model: ProcessModel, layout: DiagramLayout, options: R
       `<rect x="${num(ext.x)}" y="${num(ext.y)}" width="${num(ext.width)}" height="${num(ext.height)}" fill="${theme.external.fill}" stroke="${theme.external.stroke}" stroke-width="1.4"/>`,
     );
     const height = ext.labelLines.length * METRICS.bandLine;
+    const centre = ext.x + ext.width / 2 + (ext.labelOffset ?? 0);
+    const name = textElement(
+      {
+        lines: ext.labelLines,
+        x: centre,
+        y: ext.y + (ext.height - height) / 2,
+        anchor: 'middle',
+        fontSize: METRICS.bandFont,
+        lineHeight: METRICS.bandLine,
+        width: 0,
+        height,
+      },
+      { fill: theme.band.text, bold: true },
+    );
+    // On screen the name of a wide pool follows the part of it that is in view;
+    // the viewer needs to know how far it may move.
     parts.push(
-      textElement(
-        {
-          lines: ext.labelLines,
-          x: ext.x + ext.width / 2,
-          y: ext.y + (ext.height - height) / 2,
-          anchor: 'middle',
-          fontSize: METRICS.bandFont,
-          lineHeight: METRICS.bandLine,
-          width: 0,
-          height,
-        },
-        { fill: theme.band.text, bold: true },
-      ),
+      options.interactive
+        ? `<g class="sp-band-name" data-x="${num(ext.x)}" data-width="${num(ext.width)}" data-centre="${num(centre)}" data-name-width="${num(blockWidth(ext.labelLines, METRICS.bandFont, true))}">${name}</g>`
+        : name,
     );
   }
 

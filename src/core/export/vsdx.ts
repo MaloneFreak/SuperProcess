@@ -281,10 +281,24 @@ class PageWriter {
     const name = `${kind}.${id}`;
 
     if (band.headerWidth === 0) {
-      // Collapsed pool: the name sits in the middle of the band.
+      // Collapsed pool: the name sits in the middle of the band, or beside a
+      // message flow that has to cross it.
+      const w = inch(band.width);
+      const h = inch(band.height);
+      const shift = inch(band.labelOffset ?? 0);
+      const textBlock = shift
+        ? cell('TxtPinX', w / 2 + shift) +
+          cell('TxtPinY', h / 2, 'Height*0.5') +
+          cell('TxtWidth', w, 'Width*1') +
+          cell('TxtHeight', h, 'Height*1') +
+          cell('TxtLocPinX', w / 2, 'TxtWidth*0.5') +
+          cell('TxtLocPinY', h / 2, 'TxtHeight*0.5') +
+          cell('TxtAngle', 0)
+        : '';
       this.shapes.push(
         `<Shape ID="${id}" NameU="${name}" Name="${name}" Type="Shape" LineStyle="3" FillStyle="3" TextStyle="3">` +
           this.xform(band) +
+          textBlock +
           formatCells(format) +
           cell('VerticalAlign', 1) +
           cell('ObjType', 4) +

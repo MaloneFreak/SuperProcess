@@ -26,6 +26,15 @@ test('first run without an AI: the sample process, BPMN check, step details, the
   await expect(page.getByTestId('analysis-title')).toHaveText('Supplier invoice payment');
   await expect(page.locator('[data-testid=diagram] svg .sp-node')).toHaveCount(24);
 
+  // The Supplier pool runs the whole length of the process. Its name stays in
+  // view although the middle of the band is far off to the right.
+  const frame = (await page.getByTestId('diagram').locator('..').boundingBox())!;
+  const supplier = page.locator('.sp-band-name').first();
+  await expect(supplier).toHaveText('Supplier');
+  const name = (await supplier.boundingBox())!;
+  expect(name.x).toBeGreaterThan(frame.x);
+  expect(name.x + name.width).toBeLessThan(frame.x + frame.width);
+
   await page.locator('[data-tab=quality]').click();
   await expect(page.getByTestId('bpmn-score')).toHaveText('99');
 

@@ -307,6 +307,7 @@
     "languageLabel": "Report language",
     "languageAuto": "Same as the diagram",
     "formatLabel": "File format",
+    "generateNone": "Generate report",
     "generate_one": "Generate {{count}} report",
     "generate_other": "Generate {{count}} reports",
     "needAi": "Connect an AI in Settings to generate reports.",

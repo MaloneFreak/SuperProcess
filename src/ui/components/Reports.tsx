@@ -262,7 +262,7 @@ export function ReportsPanel({ analysis, layout }: { analysis: Analysis; layout:
             </Field>
           </div>
           <Button variant="primary" size="lg" className="w-full" disabled={!ready || selected.size === 0 || customMissing} onClick={generate} icon={<Sparkles size={17} />} data-testid="generate-reports">
-            {t('reports.generate', { count: Math.max(1, selected.size) })}
+            {selected.size === 0 ? t('reports.generateNone') : t('reports.generate', { count: selected.size })}
           </Button>
           {!ready && (
             <Notice tone="info" icon={<CircleAlert size={16} className="text-info" />}>

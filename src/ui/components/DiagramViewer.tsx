@@ -67,6 +67,25 @@ export function DiagramViewer({
     }
   }, [open, width, height]);
 
+  // The name of an external pool is drawn in the middle of its band, which on
+  // a wide process is often out of view. It slides along the band to stay in
+  // the part that is visible.
+  useLayoutEffect(() => {
+    const box = container.current;
+    if (!box) return;
+    // The visible stretch in diagram coordinates, less a margin on screen.
+    const left = (24 - view.x) / view.scale;
+    const right = (box.clientWidth - 24 - view.x) / view.scale;
+    for (const name of box.querySelectorAll<SVGGElement>('.sp-band-name')) {
+      const centre = Number(name.dataset.centre);
+      const half = Number(name.dataset.nameWidth) / 2;
+      const from = Math.max(Number(name.dataset.x) + half + 12, left + half);
+      const to = Math.min(Number(name.dataset.x) + Number(name.dataset.width) - half - 12, right - half);
+      const target = from <= to ? Math.min(to, Math.max(from, centre)) : centre;
+      name.setAttribute('transform', `translate(${Math.round(target - centre)} 0)`);
+    }
+  }, [view, svg]);
+
   const zoomAt = useCallback((factor: number, cx: number, cy: number): void => {
     setView((current) => {
       const scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, current.scale * factor));

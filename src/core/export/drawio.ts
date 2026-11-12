@@ -180,6 +180,8 @@ export function exportDrawio(model: ProcessModel, layout: DiagramLayout, theme: 
 
   for (const ext of layout.externals) {
     boxOf.set(ext.id, ext);
+    // A centred label moves by half of the spacing added on one side.
+    const shift = ext.labelOffset ?? 0;
     cells.push(
       `<mxCell id="${escapeXml(ext.id)}" value="${escapeXml(ext.name)}" style="${style({
         rounded: 0,
@@ -187,6 +189,8 @@ export function exportDrawio(model: ProcessModel, layout: DiagramLayout, theme: 
         html: 1,
         fillColor: theme.external.fill,
         strokeColor: theme.external.stroke,
+        spacingLeft: shift > 0 ? n(shift * 2) : undefined,
+        spacingRight: shift < 0 ? n(-shift * 2) : undefined,
         ...bandText,
       })}" vertex="1" parent="1">${geometry(ext)}</mxCell>`,
     );

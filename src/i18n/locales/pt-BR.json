@@ -307,6 +307,7 @@
     "languageLabel": "Idioma do relatório",
     "languageAuto": "O mesmo do diagrama",
     "formatLabel": "Formato do arquivo",
+    "generateNone": "Gerar relatório",
     "generate_one": "Gerar {{count}} relatório",
     "generate_other": "Gerar {{count}} relatórios",
     "needAi": "Conecte uma IA nas Configurações para gerar relatórios.",

@@ -307,6 +307,7 @@
     "languageLabel": "Idioma del informe",
     "languageAuto": "El mismo que el diagrama",
     "formatLabel": "Formato del archivo",
+    "generateNone": "Generar informe",
     "generate_one": "Generar {{count}} informe",
     "generate_other": "Generar {{count}} informes",
     "needAi": "Conecta una IA en Ajustes para generar informes.",
