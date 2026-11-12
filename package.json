@@ -1,0 +1,51 @@
+{
+  "name": "superprocess",
+  "productName": "SuperProcess",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Turn meeting transcripts and existing diagrams into clean BPMN 2.0 process maps (Visio, BPMN, draw.io) and AI-written process reports.",
+  "license": "MIT",
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "e2e": "playwright test",
+    "desktop": "npm run build && electron .",
+    "dist:desktop": "npm run build && electron-builder --publish never"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.8.0",
+    "docx": "^9.15.3",
+    "fflate": "^0.8.3",
+    "i18next": "^27.1.1",
+    "idb-keyval": "^6.3.0",
+    "lucide-react": "^1.72.0",
+    "pdfjs-dist": "^6.5.438",
+    "pdfmake": "^0.3.14",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-i18next": "^18.0.1",
+    "zustand": "^5.1.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@tailwindcss/vite": "^4.3.5",
+    "@types/node": "^26.6.6",
+    "@types/pdfmake": "^0.3.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "bpmn-moddle": "^10.3.1",
+    "jsdom": "^31.0.0",
+    "tailwindcss": "^4.3.5",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8",
+    "vite-plugin-pwa": "^2.0.0",
+    "vitest": "^5.1.0"
+  }
+}
