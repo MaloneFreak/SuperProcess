@@ -57,7 +57,7 @@ export async function reportToPdf(doc: ReportDocument, diagram: DiagramImage): P
   for (const block of doc.blocks) {
     switch (block.t) {
       case 'heading':
-        content.push({ text: block.text, style: block.level === 1 ? 'h1' : 'h2' });
+        content.push({ text: block.text, style: block.level === 1 ? 'h1' : 'h2', headlineLevel: block.level });
         break;
       case 'paragraph':
         content.push({ text: block.text, margin: [0, 0, 0, 7] });
@@ -71,7 +71,7 @@ export async function reportToPdf(doc: ReportDocument, diagram: DiagramImage): P
         content.push({
           margin: [0, 0, 0, 10],
           columns: [
-            { width: 'auto', text: [{ text: String(block.value), fontSize: 30, bold: true, color }, { text: `  ${block.outOf}`, color: '#56607a' }] },
+            { width: 'auto', noWrap: true, text: [{ text: String(block.value), fontSize: 30, bold: true, color }, { text: `  ${block.outOf}`, color: '#56607a' }] },
             { width: '*', margin: [16, 4, 0, 0], stack: [{ text: block.label, bold: true, fontSize: 12 }, { text: block.rationale, color: '#56607a', margin: [0, 3, 0, 0] }] },
           ],
         });
@@ -147,6 +147,8 @@ export async function reportToPdf(doc: ReportDocument, diagram: DiagramImage): P
       h2: { fontSize: 11.5, bold: true, margin: [0, 10, 0, 5] },
     },
     footer: (page: number, pages: number) => ({ text: `${page} / ${pages}`, alignment: 'center', fontSize: 8, color: '#8790a5', margin: [0, 18, 0, 0] }),
+    // Never leave a heading alone at the bottom of a page.
+    pageBreakBefore: (node, queries) => node.headlineLevel !== undefined && queries.getFollowingNodesOnPage().length === 0,
     content,
   };
   return engine.createPdf(definition).getBlob();
