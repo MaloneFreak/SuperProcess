@@ -1,0 +1,120 @@
+{
+  "title": "Cost review: supplier invoice payment",
+  "executiveSummary": "The process pays invoices correctly but spends most of its effort on work that adds no value: typing invoice data, chasing purchase order numbers and waiting for approvals by e-mail.\n- About 50 hours a month go into manual data entry alone (600 invoices at 5 minutes each).\n- Approvals take three days on average and caused late fees twice last quarter.\n- Two duplicate payments were found last year because the duplicate check depends on exact typing.\nCapturing invoices automatically and moving approvals into the ERP would remove most of this cost within a few months.",
+  "score": {
+    "value": 46,
+    "label": "Significant savings available",
+    "rationale": "Twelve of fourteen activities are manual, one invoice in five needs rework to find its purchase order, and the slowest step has no system support."
+  },
+  "dimensions": [
+    { "name": "Manual effort", "score": 30, "comment": "Data entry, matching and reconciliation are all done by hand." },
+    { "name": "Rework and errors", "score": 45, "comment": "Missing purchase orders and mismatches send invoices back; duplicates slip through." },
+    { "name": "Hand-offs and waiting", "score": 40, "comment": "Seven hand-offs; approvals wait three days on average." },
+    { "name": "Automation level", "score": 35, "comment": "The ERP is used as a register, not as a workflow." },
+    { "name": "Control overhead", "score": 80, "comment": "The dual authorisation at the bank is proportionate." }
+  ],
+  "metrics": [
+    { "label": "Invoices per month", "value": "about 600", "note": "Stated by accounts payable [00:31]." },
+    { "label": "Data entry effort", "value": "about 50 hours a month", "note": "Estimate: 600 invoices × 5 minutes." },
+    { "label": "Invoices without a purchase order", "value": "about 20%", "note": "\"About one in five\" [00:58]." },
+    { "label": "Approval lead time", "value": "3 days on average", "note": "Stated by the AP manager [02:26]." },
+    { "label": "Reconciliation effort", "value": "about 16 hours a month", "note": "Estimate: 2 hours, twice a week." }
+  ],
+  "findings": [
+    {
+      "id": "F1",
+      "title": "Invoice data is typed into the ERP by hand",
+      "severity": "high",
+      "category": "Manual effort",
+      "steps": ["t1"],
+      "description": "Every invoice is opened and its supplier, amount, due date and purchase order number are keyed in manually.",
+      "evidence": "\"I open each one and type the data into the ERP by hand ... about five minutes per invoice, and we get roughly 600 a month.\" (Paulo, 00:31)",
+      "impact": "Roughly 50 hours of clerical work a month, plus typing errors that defeat the duplicate check.",
+      "recommendation": "Introduce invoice capture (e-invoice import or OCR) so accounts payable only reviews exceptions. Owner: AP manager."
+    },
+    {
+      "id": "F2",
+      "title": "Approvals by e-mail are slow and cause late fees",
+      "severity": "high",
+      "category": "Waiting",
+      "steps": ["t5", "t6"],
+      "description": "Approvers reply by e-mail, by phone or in the corridor. Nothing reminds them and nobody can see what is pending.",
+      "evidence": "\"Three days on average, and if the manager is travelling it can be more than a week. We paid late fees twice last quarter.\" (Carla, 02:26)",
+      "impact": "Late fees, lost early-payment discounts and time spent chasing approvers.",
+      "recommendation": "Use the ERP approval workflow with mobile approval, automatic reminders after 24 hours and a named deputy for each cost centre."
+    },
+    {
+      "id": "F3",
+      "title": "One invoice in five arrives without a purchase order",
+      "severity": "medium",
+      "category": "Rework",
+      "steps": ["t2", "t2b"],
+      "description": "Accounts payable has to find out who ordered and wait for the purchase order number before the invoice can be matched.",
+      "evidence": "\"Then I e-mail the person who ordered it and wait. That can take days. About one in five invoices comes without a PO.\" (Paulo, 00:58)",
+      "impact": "About 120 invoices a month are handled twice and wait days before matching can start.",
+      "recommendation": "Adopt a \"no PO, no pay\" rule with suppliers and reject invoices without a purchase order at the source."
+    },
+    {
+      "id": "F4",
+      "title": "Duplicate payments are not reliably prevented",
+      "severity": "medium",
+      "category": "Errors",
+      "steps": ["t1"],
+      "description": "The duplicate check compares invoice numbers exactly as typed, so a small typing difference lets a duplicate through.",
+      "evidence": "\"If the number is typed slightly differently it goes through. We found two duplicate payments last year.\" (Paulo, 03:54)",
+      "impact": "Cash paid twice and effort to recover it. The amounts were not stated.",
+      "recommendation": "Add a fuzzy duplicate check on supplier, amount and date before each payment run."
+    },
+    {
+      "id": "F5",
+      "title": "Bank reconciliation is done in a spreadsheet",
+      "severity": "low",
+      "category": "Manual effort",
+      "steps": ["t11", "t12"],
+      "description": "Treasury downloads the statement, reconciles it in a spreadsheet and then marks each invoice as paid in the ERP.",
+      "evidence": "\"That reconciliation is manual and takes me about two hours each time.\" (Rui, 03:28)",
+      "impact": "About 16 hours a month of treasury time.",
+      "recommendation": "Import the bank statement into the ERP and let it clear paid invoices automatically."
+    }
+  ],
+  "sections": [
+    {
+      "heading": "Cost drivers by step",
+      "body": "The table lists the steps where effort or money is lost, from the largest driver to the smallest.",
+      "table": {
+        "columns": ["Step", "Lane", "Cost driver", "Why it costs", "Saving potential"],
+        "rows": [
+          ["Register invoice in ERP", "Accounts payable", "Manual data entry", "5 minutes for each of about 600 invoices a month", "High: about 50 hours a month (estimate)"],
+          ["Approve invoice", "Cost centre manager", "Waiting and chasing", "3 days on average; late fees twice last quarter", "High: fees and discounts; amounts not stated"],
+          ["Ask requester for PO number", "Accounts payable", "Rework", "One invoice in five handled twice", "Medium"],
+          ["Reconcile bank statement", "Treasury", "Manual reconciliation", "2 hours, twice a week", "Medium: about 16 hours a month (estimate)"],
+          ["Return invoice to supplier", "Accounts payable", "Rework", "Mismatches are found only after data entry", "Low"]
+        ]
+      }
+    },
+    {
+      "heading": "Quick wins and structural changes",
+      "body": "Within weeks, with what already exists:\n- Name a deputy approver for every cost centre.\n- Send suppliers a notice that invoices need a purchase order number.\n- Run a duplicate report on supplier, amount and date before each payment run.\nNeeding investment:\n- Invoice capture and automatic three-way matching.\n- Approval workflow in the ERP.\n- Automatic bank statement import.",
+      "table": { "columns": [], "rows": [] }
+    },
+    {
+      "heading": "Savings estimate and assumptions",
+      "body": "The sources give volumes and durations for data entry and reconciliation, which together account for about 66 hours a month. They do not give hourly cost, the value of late fees or of the duplicate payments, so no monetary saving is stated here. To size it, collect: the loaded hourly cost of accounts payable and treasury, late fees paid in the last twelve months, early-payment discounts missed, and the value of the duplicates found.",
+      "table": { "columns": [], "rows": [] }
+    }
+  ],
+  "actions": [
+    { "title": "Name deputy approvers", "description": "One deputy per cost centre, with the same limit.", "priority": "high", "effort": "low", "impact": "medium", "horizon": "quickWin", "findings": ["F2"] },
+    { "title": "Enforce purchase orders with suppliers", "description": "Communicate the rule and reject invoices without a PO.", "priority": "high", "effort": "low", "impact": "medium", "horizon": "quickWin", "findings": ["F3"] },
+    { "title": "Add a pre-payment duplicate check", "description": "Report on supplier, amount and date before each run.", "priority": "medium", "effort": "low", "impact": "medium", "horizon": "quickWin", "findings": ["F4"] },
+    { "title": "Move approvals into the ERP workflow", "description": "Mobile approval, reminders and an audit trail.", "priority": "high", "effort": "medium", "impact": "high", "horizon": "shortTerm", "findings": ["F2"] },
+    { "title": "Automate invoice capture and matching", "description": "E-invoice import or OCR with automatic three-way match.", "priority": "high", "effort": "high", "impact": "high", "horizon": "mediumTerm", "findings": ["F1", "F4"] },
+    { "title": "Import bank statements automatically", "description": "Clear paid invoices in the ERP without the spreadsheet.", "priority": "medium", "effort": "medium", "impact": "medium", "horizon": "mediumTerm", "findings": ["F5"] }
+  ],
+  "openQuestions": [
+    "What is the loaded hourly cost of the accounts payable and treasury staff?",
+    "How much was paid in late fees in the last twelve months?",
+    "Which share of suppliers can send structured e-invoices?"
+  ],
+  "limitations": "The meeting gave no monetary values, so savings are expressed in hours. Volumes and durations are the participants' estimates and were not measured."
+}

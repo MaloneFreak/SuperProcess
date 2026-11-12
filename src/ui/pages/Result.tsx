@@ -293,13 +293,13 @@ export function ResultPage({ id }: { id: string }): ReactNode {
         <SaveButton analysis={analysis} onSave={(format) => void save(format)} busy={saving} />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_370px]">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_400px]">
         <div className="h-[460px] lg:h-[calc(100vh-250px)] lg:min-h-[480px]">
           <DiagramViewer svg={svg} width={layout.width} height={layout.height} background={theme.background} onSelect={select} />
         </div>
 
         <Card className="flex max-h-[calc(100vh-250px)] min-h-[320px] flex-col overflow-hidden lg:min-h-[480px]">
-          <div className="flex gap-1 border-b border-line px-2 pt-2" role="tablist">
+          <div className="flex gap-0.5 overflow-x-auto border-b border-line px-2 pt-2" role="tablist">
             {tabs.map((item) => (
               <button
                 key={item.id}
@@ -309,7 +309,7 @@ export function ResultPage({ id }: { id: string }): ReactNode {
                 data-tab={item.id}
                 onClick={() => setTab(item.id)}
                 className={cx(
-                  '-mb-px inline-flex items-center gap-1.5 rounded-t-lg border-b-2 px-2.5 py-2 text-[13px] font-medium',
+                  '-mb-px inline-flex shrink-0 items-center gap-1.5 rounded-t-lg border-b-2 px-2.5 py-2 text-[13px] font-medium whitespace-nowrap',
                   tab === item.id ? 'border-accent text-fg' : 'border-transparent text-muted hover:text-fg',
                 )}
               >

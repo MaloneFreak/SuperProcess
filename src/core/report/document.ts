@@ -221,7 +221,7 @@ export function buildReportDocument(report: Report, model: ProcessModel, focusNa
 
   if (content.openQuestions.length > 0) {
     heading(t('report.openQuestions'));
-    blocks.push({ t: 'bullets', items: content.openQuestions });
+    blocks.push({ t: 'bullets', items: [...content.openQuestions] });
   }
   if (content.limitations) {
     heading(t('report.limitations'));
@@ -373,7 +373,7 @@ export const REPORT_CSS = `
 .report h3{font-size:16px;margin:26px 0 8px}
 .report h4{font-size:15px;margin:0;display:inline}
 .report p{margin:0 0 12px}
-.report ul{margin:0 0 12px;padding-left:22px}
+.report ul{margin:0 0 12px;padding-left:22px;list-style:disc}
 .report li{margin:3px 0}
 .report .meta{display:grid;grid-template-columns:max-content 1fr;gap:2px 16px;margin:0 0 8px;color:var(--r-muted);font-size:14px}
 .report .meta b{color:var(--r-fg);font-weight:600}

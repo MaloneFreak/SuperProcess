@@ -41,14 +41,31 @@ export function DiagramViewer({
     setView({ scale, x: (box.clientWidth - width * scale) / 2, y: (box.clientHeight - height * scale) / 2 });
   }, [width, height]);
 
-  // Fit when a different diagram is shown (not on every re-render of the same one).
+  // Opening view: the whole diagram if it stays readable, otherwise its start
+  // at a readable size (wide processes are read left to right).
+  const open = useCallback((): void => {
+    const box = container.current;
+    if (!box) return;
+    const pad = 16;
+    const byWidth = (box.clientWidth - pad * 2) / width;
+    const byHeight = (box.clientHeight - pad * 2) / height;
+    const whole = Math.min(byWidth, byHeight, 1.25);
+    if (whole >= 0.55) {
+      fit();
+      return;
+    }
+    const scale = Math.min(byHeight, 0.8);
+    setView({ scale, x: pad, y: (box.clientHeight - height * scale) / 2 });
+  }, [fit, width, height]);
+
+  // Position the view when a different diagram is shown (not on every re-render of the same one).
   useLayoutEffect(() => {
     const key = `${width}x${height}`;
     if (fitted.current !== key) {
       fitted.current = key;
-      fit();
+      open();
     }
-  }, [fit, width, height]);
+  }, [open, width, height]);
 
   const zoomAt = useCallback((factor: number, cx: number, cy: number): void => {
     setView((current) => {

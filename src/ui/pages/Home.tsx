@@ -206,7 +206,6 @@ export function HomePage(): ReactNode {
             {t('home.trySample')}
           </button>
           <div className="flex-1" />
-          {!ready && <span className="text-xs text-muted">{t('home.analyzeNeedsAi')}</span>}
           <Button
             variant="primary"
             size="lg"
@@ -218,6 +217,7 @@ export function HomePage(): ReactNode {
             {t('home.analyze')}
           </Button>
         </div>
+        {!ready && <p className="mt-2 text-right text-xs text-muted">{t('home.analyzeNeedsAi')}</p>}
       </Card>
 
       <section className="mt-10">

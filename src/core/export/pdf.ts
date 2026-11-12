@@ -63,7 +63,8 @@ export async function reportToPdf(doc: ReportDocument, diagram: DiagramImage): P
         content.push({ text: block.text, margin: [0, 0, 0, 7] });
         break;
       case 'bullets':
-        content.push({ ul: block.items, margin: [0, 0, 0, 8] });
+        // pdfmake rewrites the arrays it is given, so it always gets copies.
+        content.push({ ul: [...block.items], margin: [0, 0, 0, 8] });
         break;
       case 'score': {
         const color = block.value >= 75 ? '#15803d' : block.value >= 50 ? '#b45309' : '#c2271f';

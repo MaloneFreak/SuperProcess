@@ -124,14 +124,24 @@ async function persist(analysis: Analysis): Promise<void> {
   await refreshHistory();
 }
 
-/** Applies a change to an analysis, whether or not it is the one on screen. */
-export async function updateAnalysis(id: string, change: (analysis: Analysis) => Analysis): Promise<void> {
-  const base = get().current?.id === id ? get().current : await loadAnalysis(id);
-  if (!base) return;
-  const next = change(base);
-  await saveAnalysis(next);
-  if (get().current?.id === id) set({ current: next });
-  await refreshHistory();
+let writes: Promise<void> = Promise.resolve();
+
+/**
+ * Applies a change to an analysis, whether or not it is the one on screen.
+ * Changes are applied one after another: reports that finish at the same
+ * moment must each see the other's result instead of overwriting it.
+ */
+export function updateAnalysis(id: string, change: (analysis: Analysis) => Analysis): Promise<void> {
+  const run = async (): Promise<void> => {
+    const base = get().current?.id === id ? get().current : await loadAnalysis(id);
+    if (!base) return;
+    const next = change(base);
+    await saveAnalysis(next);
+    if (get().current?.id === id) set({ current: next });
+    await refreshHistory();
+  };
+  writes = writes.then(run, run);
+  return writes;
 }
 
 export async function removeAnalysis(id: string): Promise<void> {

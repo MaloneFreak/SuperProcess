@@ -1,0 +1,698 @@
+{
+  "name": "Supplier invoice payment",
+  "summary": "A supplier invoice arrives by e-mail and is keyed into the ERP. Accounts payable matches it with the purchase order and goods receipt, obtains approval according to the amount, and schedules it. Treasury pays twice a week through the bank portal, reconciles the statement and confirms the payment to the supplier.",
+  "language": "en",
+  "pool": "Finance department",
+  "lanes": [
+    {
+      "id": "ap",
+      "name": "Accounts payable"
+    },
+    {
+      "id": "req",
+      "name": "Requester"
+    },
+    {
+      "id": "mgr",
+      "name": "Cost centre manager"
+    },
+    {
+      "id": "cfo",
+      "name": "Finance director"
+    },
+    {
+      "id": "tre",
+      "name": "Treasury"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "s1",
+      "type": "startEvent",
+      "name": "Invoice received",
+      "lane": "ap",
+      "eventKind": "message",
+      "attachedTo": "",
+      "interrupting": true,
+      "loop": "none",
+      "description": "",
+      "systems": [],
+      "inputs": [],
+      "outputs": [],
+      "duration": "",
+      "issues": []
+    },
+    {
+      "id": "t1",
+      "type": "userTask",
+      "name": "Register invoice in ERP",
+      "lane": "ap",
+      "eventKind": "none",
+      "attachedTo": "",
+      "interrupting": true,
+      "loop": "none",
+      "description": "The invoice data (supplier, amount, due date, PO number) is typed into the ERP by hand.",
+      "systems": [
+        "ERP",
+        "E-mail"
+      ],
+      "inputs": [
+        "Invoice"
+      ],
+      "outputs": [],
+      "duration": "5 minutes per invoice",
+      "issues": [
+        "Manual data entry: about 5 minutes per invoice, roughly 600 invoices a month",
+        "Duplicate check fails when the invoice number is typed differently; two duplicate payments last year",
+        "The same person registers suppliers and enters invoices (raised by audit)"
+      ]
+    },
+    {
+      "id": "g1",
+      "type": "exclusiveGateway",
+      "name": "PO number on invoice?",
+      "lane": "ap",
+      "eventKind": "none",
+      "attachedTo": "",
+      "interrupting": true,
+      "loop": "none",
+      "description": "",
+      "systems": [],
+      "inputs": [],
+      "outputs": [],
+      "duration": "",
+      "issues": []
+    },
+    {
+      "id": "t2",
+      "type": "sendTask",
+      "name": "Ask requester for PO number",
+      "lane": "ap",
+      "eventKind": "none",
+      "attachedTo": "",
+      "interrupting": true,
+      "loop": "none",
+      "description": "",
+      "systems": [
+        "E-mail"
+      ],
+      "inputs": [],
+      "outputs": [],
+      "duration": "",
+      "issues": []
+    },
+    {
+      "id": "t2b",
+      "type": "userTask",
+      "name": "Provide PO number",
+      "lane": "req",
+      "eventKind": "none",
+      "attachedTo": "",
+      "interrupting": true,
+      "loop": "none",
+      "description": "",
+      "systems": [
+        "E-mail"
+      ],
+      "inputs": [],
+      "outputs": [],
+      "duration": "days",
+      "issues": [
+        "About one in five invoices arrives without a PO; the answer can take days"
+      ]
+    },
+    {
+      "id": "g1m",
+      "type": "exclusiveGateway",
+      "name": "",
+      "lane": "ap",
+      "eventKind": "none",
+      "attachedTo": "",
+      "interrupting": true,
+      "loop": "none",
+      "description": "",
+      "systems": [],
+      "inputs": [],
+      "outputs": [],
+      "duration": "",
+      "issues": []
+    },
+    {
+      "id": "t3",
+      "type": "userTask",
+      "name": "Match invoice, PO and receipt",
+      "lane": "ap",
+      "eventKind": "none",
+      "attachedTo": "",
+      "interrupting": true,
+      "loop": "none",
+      "description": "Three-way match of invoice, purchase order and goods receipt in the ERP.",
+      "systems": [
+        "ERP"
+      ],
+      "inputs": [
+        "Invoice",
+        "Purchase order",
+        "Goods receipt"
+      ],
+      "outputs": [],
+      "duration": "",
+      "issues": []
+    },
+    {
+      "id": "g2",
+      "type": "exclusiveGateway",
+      "name": "Documents match?",
+      "lane": "ap",
+      "eventKind": "none",
+      "attachedTo": "",
+      "interrupting": true,
+      "loop": "none",
+      "description": "",
+      "systems": [],
+      "inputs": [],
+      "outputs": [],
+      "duration": "",
+      "issues": []
+    },
+    {
+      "id": "t4",
+      "type": "sendTask",
+      "name": "Return invoice to supplier",
+      "lane": "ap",
+      "eventKind": "none",
+      "attachedTo": "",
+      "interrupting": true,
+      "loop": "none",
+      "description": "",
+      "systems": [
+        "E-mail"
+      ],
+      "inputs": [],
+      "outputs": [],
+      "duration": "",
+      "issues": []
+    },
+    {
+      "id": "e1",
+      "type": "endEvent",
+      "name": "Invoice returned",
+      "lane": "ap",
+      "eventKind": "none",
+      "attachedTo": "",
+      "interrupting": true,
+      "loop": "none",
+      "description": "",
+      "systems": [],
+      "inputs": [],
+      "outputs": [],
+      "duration": "",
+      "issues": []
+    },
+    {
+      "id": "t5",
+      "type": "userTask",
+      "name": "Approve invoice",
+      "lane": "mgr",
+      "eventKind": "none",
+      "attachedTo": "",
+      "interrupting": true,
+      "loop": "none",
+      "description": "The manager replies \"approved\" by e-mail; the e-mail is filed in a folder.",
+      "systems": [
+        "E-mail"
+      ],
+      "inputs": [],
+      "outputs": [],
+      "duration": "3 days on average",
+      "issues": [
+        "Three days on average; more than a week when the manager is travelling",
+        "Approvals by phone or in the corridor leave no record",
+        "Late fees were paid twice last quarter"
+      ]
+    },
+    {
+      "id": "g3",
+      "type": "exclusiveGateway",
+      "name": "Amount above 10,000?",
+      "lane": "mgr",
+      "eventKind": "none",
+      "attachedTo": "",
+      "interrupting": true,
+      "loop": "none",
+      "description": "",
+      "systems": [],
+      "inputs": [],
+      "outputs": [],
+      "duration": "",
+      "issues": []
+    },
+    {
+      "id": "t6",
+      "type": "userTask",
+      "name": "Approve invoice",
+      "lane": "cfo",
+      "eventKind": "none",
+      "attachedTo": "",
+      "interrupting": true,
+      "loop": "none",
+      "description": "",
+      "systems": [
+        "E-mail"
+      ],
+      "inputs": [],
+      "outputs": [],
+      "duration": "",
+      "issues": []
+    },
+    {
+      "id": "g3m",
+      "type": "exclusiveGateway",
+      "name": "",
+      "lane": "ap",
+      "eventKind": "none",
+      "attachedTo": "",
+      "interrupting": true,
+      "loop": "none",
+      "description": "",
+      "systems": [],
+      "inputs": [],
+      "outputs": [],
+      "duration": "",
+      "issues": []
+    },
+    {
+      "id": "t7",
+      "type": "userTask",
+      "name": "Schedule payment",
+      "lane": "ap",
+      "eventKind": "none",
+      "attachedTo": "",
+      "interrupting": true,
+      "loop": "none",
+      "description": "",
+      "systems": [
+        "ERP"
+      ],
+      "inputs": [],
+      "outputs": [],
+      "duration": "",
+      "issues": []
+    },
+    {
+      "id": "w1",
+      "type": "intermediateCatchEvent",
+      "name": "Tuesday or Thursday",
+      "lane": "tre",
+      "eventKind": "timer",
+      "attachedTo": "",
+      "interrupting": true,
+      "loop": "none",
+      "description": "",
+      "systems": [],
+      "inputs": [],
+      "outputs": [],
+      "duration": "",
+      "issues": []
+    },
+    {
+      "id": "t8",
+      "type": "userTask",
+      "name": "Generate payment file",
+      "lane": "tre",
+      "eventKind": "none",
+      "attachedTo": "",
+      "interrupting": true,
+      "loop": "none",
+      "description": "",
+      "systems": [
+        "ERP"
+      ],
+      "inputs": [],
+      "outputs": [
+        "Payment file"
+      ],
+      "duration": "",
+      "issues": []
+    },
+    {
+      "id": "t9",
+      "type": "sendTask",
+      "name": "Upload file to bank portal",
+      "lane": "tre",
+      "eventKind": "none",
+      "attachedTo": "",
+      "interrupting": true,
+      "loop": "none",
+      "description": "",
+      "systems": [
+        "Bank portal"
+      ],
+      "inputs": [
+        "Payment file"
+      ],
+      "outputs": [],
+      "duration": "",
+      "issues": []
+    },
+    {
+      "id": "t10",
+      "type": "userTask",
+      "name": "Authorise payment in portal",
+      "lane": "tre",
+      "eventKind": "none",
+      "attachedTo": "",
+      "interrupting": true,
+      "loop": "none",
+      "description": "A second person from treasury authorises the payment; the bank requires two people.",
+      "systems": [
+        "Bank portal"
+      ],
+      "inputs": [],
+      "outputs": [],
+      "duration": "",
+      "issues": []
+    },
+    {
+      "id": "w2",
+      "type": "intermediateCatchEvent",
+      "name": "Next day",
+      "lane": "tre",
+      "eventKind": "timer",
+      "attachedTo": "",
+      "interrupting": true,
+      "loop": "none",
+      "description": "",
+      "systems": [],
+      "inputs": [],
+      "outputs": [],
+      "duration": "",
+      "issues": []
+    },
+    {
+      "id": "t11",
+      "type": "userTask",
+      "name": "Reconcile bank statement",
+      "lane": "tre",
+      "eventKind": "none",
+      "attachedTo": "",
+      "interrupting": true,
+      "loop": "none",
+      "description": "",
+      "systems": [
+        "Spreadsheet",
+        "Bank portal"
+      ],
+      "inputs": [
+        "Bank statement"
+      ],
+      "outputs": [],
+      "duration": "about 2 hours",
+      "issues": [
+        "Manual reconciliation in a spreadsheet, about two hours each time"
+      ]
+    },
+    {
+      "id": "t12",
+      "type": "userTask",
+      "name": "Mark invoice as paid",
+      "lane": "tre",
+      "eventKind": "none",
+      "attachedTo": "",
+      "interrupting": true,
+      "loop": "none",
+      "description": "",
+      "systems": [
+        "ERP"
+      ],
+      "inputs": [],
+      "outputs": [],
+      "duration": "",
+      "issues": []
+    },
+    {
+      "id": "t13",
+      "type": "sendTask",
+      "name": "Send remittance advice",
+      "lane": "tre",
+      "eventKind": "none",
+      "attachedTo": "",
+      "interrupting": true,
+      "loop": "none",
+      "description": "",
+      "systems": [
+        "E-mail"
+      ],
+      "inputs": [],
+      "outputs": [
+        "Remittance advice"
+      ],
+      "duration": "",
+      "issues": []
+    },
+    {
+      "id": "e2",
+      "type": "endEvent",
+      "name": "Invoice paid",
+      "lane": "tre",
+      "eventKind": "none",
+      "attachedTo": "",
+      "interrupting": true,
+      "loop": "none",
+      "description": "",
+      "systems": [],
+      "inputs": [],
+      "outputs": [],
+      "duration": "",
+      "issues": []
+    }
+  ],
+  "flows": [
+    {
+      "id": "f1",
+      "from": "s1",
+      "to": "t1",
+      "label": "",
+      "isDefault": false
+    },
+    {
+      "id": "f2",
+      "from": "t1",
+      "to": "g1",
+      "label": "",
+      "isDefault": false
+    },
+    {
+      "id": "f3",
+      "from": "g1",
+      "to": "g1m",
+      "label": "Yes",
+      "isDefault": false
+    },
+    {
+      "id": "f4",
+      "from": "g1",
+      "to": "t2",
+      "label": "No",
+      "isDefault": false
+    },
+    {
+      "id": "f5",
+      "from": "t2",
+      "to": "t2b",
+      "label": "",
+      "isDefault": false
+    },
+    {
+      "id": "f6",
+      "from": "t2b",
+      "to": "g1m",
+      "label": "",
+      "isDefault": false
+    },
+    {
+      "id": "f7",
+      "from": "g1m",
+      "to": "t3",
+      "label": "",
+      "isDefault": false
+    },
+    {
+      "id": "f8",
+      "from": "t3",
+      "to": "g2",
+      "label": "",
+      "isDefault": false
+    },
+    {
+      "id": "f9",
+      "from": "g2",
+      "to": "t5",
+      "label": "Yes",
+      "isDefault": false
+    },
+    {
+      "id": "f10",
+      "from": "g2",
+      "to": "t4",
+      "label": "No",
+      "isDefault": false
+    },
+    {
+      "id": "f11",
+      "from": "t4",
+      "to": "e1",
+      "label": "",
+      "isDefault": false
+    },
+    {
+      "id": "f12",
+      "from": "t5",
+      "to": "g3",
+      "label": "",
+      "isDefault": false
+    },
+    {
+      "id": "f13",
+      "from": "g3",
+      "to": "t6",
+      "label": "Yes",
+      "isDefault": false
+    },
+    {
+      "id": "f14",
+      "from": "g3",
+      "to": "g3m",
+      "label": "No",
+      "isDefault": false
+    },
+    {
+      "id": "f15",
+      "from": "t6",
+      "to": "g3m",
+      "label": "",
+      "isDefault": false
+    },
+    {
+      "id": "f16",
+      "from": "g3m",
+      "to": "t7",
+      "label": "",
+      "isDefault": false
+    },
+    {
+      "id": "f17",
+      "from": "t7",
+      "to": "w1",
+      "label": "",
+      "isDefault": false
+    },
+    {
+      "id": "f18",
+      "from": "w1",
+      "to": "t8",
+      "label": "",
+      "isDefault": false
+    },
+    {
+      "id": "f19",
+      "from": "t8",
+      "to": "t9",
+      "label": "",
+      "isDefault": false
+    },
+    {
+      "id": "f20",
+      "from": "t9",
+      "to": "t10",
+      "label": "",
+      "isDefault": false
+    },
+    {
+      "id": "f21",
+      "from": "t10",
+      "to": "w2",
+      "label": "",
+      "isDefault": false
+    },
+    {
+      "id": "f22",
+      "from": "w2",
+      "to": "t11",
+      "label": "",
+      "isDefault": false
+    },
+    {
+      "id": "f23",
+      "from": "t11",
+      "to": "t12",
+      "label": "",
+      "isDefault": false
+    },
+    {
+      "id": "f24",
+      "from": "t12",
+      "to": "t13",
+      "label": "",
+      "isDefault": false
+    },
+    {
+      "id": "f25",
+      "from": "t13",
+      "to": "e2",
+      "label": "",
+      "isDefault": false
+    }
+  ],
+  "externals": [
+    {
+      "id": "supplier",
+      "name": "Supplier"
+    },
+    {
+      "id": "bank",
+      "name": "Bank"
+    }
+  ],
+  "messageFlows": [
+    {
+      "id": "m1",
+      "from": "supplier",
+      "to": "s1",
+      "label": "Invoice"
+    },
+    {
+      "id": "m2",
+      "from": "t4",
+      "to": "supplier",
+      "label": "Request for corrected invoice"
+    },
+    {
+      "id": "m3",
+      "from": "t9",
+      "to": "bank",
+      "label": "Payment file"
+    },
+    {
+      "id": "m4",
+      "from": "bank",
+      "to": "t11",
+      "label": "Bank statement"
+    },
+    {
+      "id": "m5",
+      "from": "t13",
+      "to": "supplier",
+      "label": "Remittance advice"
+    }
+  ],
+  "assumptions": [
+    "What happens when an approver rejects an invoice was not discussed; no rejection path is modelled.",
+    "The 10,000 threshold is assumed to apply to the invoice total."
+  ],
+  "openQuestions": [
+    "What happens when the cost centre manager or the finance director rejects an invoice?",
+    "Who approves when the cost centre manager is absent?",
+    "How are urgent payments handled outside the Tuesday and Thursday runs?"
+  ]
+}

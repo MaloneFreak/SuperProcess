@@ -51,8 +51,9 @@ interface TextStyle {
 }
 
 function textElement(block: TextBlock, style: TextStyle): string {
+  // Labels never intercept clicks: the shape underneath is the click target.
   const attrs =
-    `text-anchor="${block.anchor}" font-size="${block.fontSize}"` +
+    `text-anchor="${block.anchor}" font-size="${block.fontSize}" pointer-events="none"` +
     (style.bold ? ' font-weight="bold"' : '') +
     (style.italic ? ' font-style="italic"' : '');
   const spans = block.lines
