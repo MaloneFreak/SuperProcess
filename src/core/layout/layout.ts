@@ -19,7 +19,7 @@
  * and image outputs identical.
  */
 import { isActivity, isEvent, isGateway, type Flow, type ProcessModel, type ProcessNode } from '../model/types';
-import { blockWidth, wrapText } from './text';
+import { blockWidth, measureText, wrapText } from './text';
 
 export interface Point {
   x: number;
@@ -180,6 +180,24 @@ interface Route {
 
 const BOUNDARY_JOG = 9;
 
+/** Task types that carry an icon in their top-left corner. */
+const ICON_TASKS: ReadonlySet<string> = new Set([
+  'userTask',
+  'manualTask',
+  'serviceTask',
+  'scriptTask',
+  'businessRuleTask',
+  'sendTask',
+  'receiveTask',
+]);
+const ICON_CLEARANCE = 24;
+
+/** True when the first line of the label is wide enough to run into the type icon. */
+function clashesWithIcon(node: ProcessNode, lines: string[]): boolean {
+  if (!ICON_TASKS.has(node.type) || lines.length === 0) return false;
+  return measureText(lines[0], METRICS.nodeFont) > METRICS.taskWidth - 2 * 27;
+}
+
 function nodeSize(node: ProcessNode): { w: number; h: number; lines: string[] } {
   if (isEvent(node.type)) return { w: METRICS.eventSize, h: METRICS.eventSize, lines: [] };
   if (isGateway(node.type)) return { w: METRICS.gatewaySize, h: METRICS.gatewaySize, lines: [] };
@@ -189,8 +207,10 @@ function nodeSize(node: ProcessNode): { w: number; h: number; lines: string[] } 
     maxLines: 6,
   });
   const marker = node.loop !== 'none' || node.type === 'subProcess' ? 14 : 0;
-  const h = Math.max(METRICS.taskHeight, lines.length * METRICS.nodeLine + 26 + marker);
-  return { w: METRICS.taskWidth, h, lines };
+  const text = lines.length * METRICS.nodeLine;
+  // Keep the label clear of the icon: it either fits beside it or starts below it.
+  const needed = clashesWithIcon(node, lines) ? ICON_CLEARANCE + text + 8 + marker : text + 26 + marker;
+  return { w: METRICS.taskWidth, h: Math.max(METRICS.taskHeight, needed), lines };
 }
 
 /** Cycle-breaking and longest-path ranking. */
@@ -881,10 +901,12 @@ export function layoutProcess(model: ProcessModel): DiagramLayout {
       if (n.lines.length > 0) {
         const height = n.lines.length * M.nodeLine;
         const marker = n.node.loop !== 'none' || n.node.type === 'subProcess' ? 7 : 0;
+        const centred = n.y + (n.h - height) / 2 - marker;
+        const top = clashesWithIcon(n.node, n.lines) ? Math.max(centred, n.y + ICON_CLEARANCE) : centred;
         label = {
           lines: n.lines,
           x: round(cx),
-          y: round(n.y + (n.h - height) / 2 - marker),
+          y: round(top),
           anchor: 'middle',
           fontSize: M.nodeFont,
           lineHeight: M.nodeLine,
