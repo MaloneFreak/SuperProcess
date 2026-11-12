@@ -164,7 +164,7 @@ The unit tests cover the model, the layout (no overlapping shapes, no flow throu
 SuperProcess is new. What has and has not been verified:
 
 - The Visio writer is tested by reading its files back and by opening them in LibreOffice Draw. It has not yet been opened in Microsoft Visio itself; if Visio reports a problem, please open an issue with the file.
-- The draw.io writer is tested by reading its files back, not in draw.io itself.
+- The draw.io writer is tested by reading its files back and against draw.io's own BPMN shape definitions. The files have not been opened in draw.io itself.
 - The desktop app has been built and run on Linux. The Windows and macOS builds are produced by the release workflow and have not been run yet.
 - AI providers are tested against scripted responses that follow their documented protocols, not against the live services.
 - PDF reports use a font that covers Latin, Cyrillic and Greek. For other scripts, use Word or HTML.

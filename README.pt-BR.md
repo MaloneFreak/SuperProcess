@@ -164,7 +164,7 @@ Os testes unitários cobrem o modelo, o layout (nenhuma forma sobreposta, nenhum
 O SuperProcess é novo. O que foi e o que não foi verificado:
 
 - O gravador de Visio é testado lendo de volta os arquivos gerados e abrindo-os no LibreOffice Draw. Ele ainda não foi aberto no Microsoft Visio em si; se o Visio apontar algum problema, abra uma issue com o arquivo.
-- O gravador de draw.io é testado lendo de volta os arquivos, não no draw.io em si.
+- O gravador de draw.io é testado lendo de volta os arquivos e contra as definições de formas BPMN do próprio draw.io. Os arquivos ainda não foram abertos no draw.io em si.
 - O app de desktop foi compilado e executado no Linux. Os builds de Windows e macOS são produzidos pelo workflow de release e ainda não foram executados.
 - Os provedores de IA são testados contra respostas simuladas que seguem os protocolos documentados, não contra os serviços reais.
 - Os relatórios em PDF usam uma fonte que cobre latim, cirílico e grego. Para outros alfabetos, use Word ou HTML.
