@@ -5,7 +5,7 @@ import { layoutProcess, type Box, type DiagramLayout, type Point } from '../src/
 import { renderSvg } from '../src/core/render/svg';
 import { getTheme } from '../src/core/render/theme';
 import type { ProcessModel } from '../src/core/model/types';
-import { linearRaw, purchaseRaw, tangledRaw } from './fixtures/models';
+import { allSymbolsRaw, linearRaw, purchaseRaw, tangledRaw } from './fixtures/models';
 
 const OUT = process.env.SP_RENDER_DIR;
 
@@ -73,6 +73,7 @@ describe('layout', () => {
     ['purchase', purchaseRaw],
     ['linear', linearRaw],
     ['tangled', tangledRaw],
+    ['all-symbols', allSymbolsRaw],
   ];
 
   for (const [name, raw] of cases) {

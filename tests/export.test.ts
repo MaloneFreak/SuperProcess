@@ -5,15 +5,17 @@ import { BpmnModdle } from 'bpmn-moddle';
 import { normalizeModel } from '../src/core/model/normalize';
 import { layoutProcess } from '../src/core/layout/layout';
 import { exportBpmn } from '../src/core/export/bpmn';
+import { exportDrawio } from '../src/core/export/drawio';
 import { exportVsdx } from '../src/core/export/vsdx';
 import { getTheme } from '../src/core/render/theme';
-import { linearRaw, purchaseRaw, tangledRaw } from './fixtures/models';
+import { allSymbolsRaw, linearRaw, purchaseRaw, tangledRaw } from './fixtures/models';
 
 const OUT = process.env.SP_RENDER_DIR;
 const cases: [string, unknown][] = [
   ['purchase', purchaseRaw],
   ['linear', linearRaw],
   ['tangled', tangledRaw],
+  ['all symbols', allSymbolsRaw],
 ];
 
 function wellFormed(xml: string): Document {
@@ -103,5 +105,123 @@ describe('Visio export', () => {
     const a = unzipSync(exportVsdx(model, layout, options));
     const b = unzipSync(exportVsdx(model, layout, options));
     expect(strFromU8(a['visio/pages/page1.xml'])).toBe(strFromU8(b['visio/pages/page1.xml']));
+  });
+});
+
+/** What draw.io's BPMN shapes accept, taken from its shape definitions (mxBpmnShape2.js). */
+const DRAWIO = {
+  shapes: ['mxgraph.bpmn.task', 'mxgraph.bpmn.event', 'mxgraph.bpmn.gateway2'],
+  outline: ['standard', 'eventInt', 'eventNonint', 'catching', 'boundInt', 'boundNonint', 'throwing', 'end', 'none'],
+  // "terminate2" and "none" draw nothing: draw.io's own palette uses them for the plain end event and for gateways.
+  symbol: [
+    'general', 'message', 'timer', 'escalation', 'conditional', 'link', 'error', 'cancel', 'compensation', 'signal',
+    'multiple', 'parallelMultiple', 'terminate', 'terminate2', 'none',
+  ],
+  taskMarker: ['abstract', 'service', 'send', 'receive', 'user', 'manual', 'businessRule', 'script'],
+  bpmnShapeType: ['task', 'transaction', 'call', 'subprocess'],
+  gwType: ['event', 'exclusive', 'parallel', 'complex'],
+};
+
+function styleOf(cell: Element): Record<string, string> {
+  const style: Record<string, string> = {};
+  for (const part of (cell.getAttribute('style') ?? '').split(';')) {
+    if (!part) continue;
+    const at = part.indexOf('=');
+    if (at < 0) style[part] = '';
+    else style[part.slice(0, at)] = part.slice(at + 1);
+  }
+  return style;
+}
+
+describe('draw.io export', () => {
+  for (const [name, raw] of cases) {
+    it(`writes an editable diagram for "${name}"`, () => {
+      const { model } = normalizeModel(raw);
+      const layout = layoutProcess(model);
+      const doc = wellFormed(exportDrawio(model, layout, getTheme('color')));
+      expect(doc.documentElement.localName).toBe('mxfile');
+
+      const cells = [...doc.getElementsByTagName('mxCell')];
+      const idOf = (cell: Element): string =>
+        (cell.parentElement?.localName === 'object' ? cell.parentElement.getAttribute('id') : cell.getAttribute('id')) ?? '';
+      const byId = new Map(cells.map((cell) => [idOf(cell), cell]));
+      expect(byId.size, 'cell ids are unique').toBe(cells.length);
+      expect(byId.has('0') && byId.get('1')?.getAttribute('parent') === '0', 'root and default layer').toBe(true);
+
+      // Steps sit inside their lane and lanes inside the pool, so moving a lane moves its steps.
+      for (const lane of model.lanes) expect(byId.get(lane.id)?.getAttribute('parent')).toBe('sp_pool');
+      for (const node of model.nodes) {
+        const cell = byId.get(node.id);
+        expect(cell, node.id).toBeDefined();
+        expect(cell?.getAttribute('vertex')).toBe('1');
+        expect(cell?.getAttribute('parent')).toBe(node.lane);
+        const geometry = cell?.getElementsByTagName('mxGeometry')[0];
+        const lane = layout.lanes.find((item) => item.id === node.lane);
+        const box = layout.nodes[node.id];
+        expect(Number(geometry?.getAttribute('x'))).toBeCloseTo(box.x - (lane?.x ?? 0), 1);
+        expect(Number(geometry?.getAttribute('y'))).toBeCloseTo(box.y - (lane?.y ?? 0), 1);
+        // The label is HTML: line breaks chosen by the layout, text escaped.
+        const label = (cell?.parentElement?.getAttribute('label') ?? '')
+          .replace(/<br>/g, ' ')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"')
+          .replace(/&amp;/g, '&');
+        expect(label).toBe(node.name);
+
+        // Only shapes and options that draw.io knows.
+        const style = styleOf(cell as Element);
+        expect(DRAWIO.shapes, `${node.id}: ${style.shape}`).toContain(style.shape);
+        for (const key of ['outline', 'symbol', 'taskMarker', 'bpmnShapeType', 'gwType'] as const) {
+          if (style[key] !== undefined) expect(DRAWIO[key], `${node.id}: ${key}=${style[key]}`).toContain(style[key]);
+        }
+      }
+
+      // Every flow is attached at both ends to a shape that exists.
+      const edges = cells.filter((cell) => cell.getAttribute('edge') === '1');
+      expect(edges).toHaveLength(model.flows.length + model.messageFlows.length);
+      for (const edge of edges) {
+        for (const end of ['source', 'target']) {
+          const target = byId.get(edge.getAttribute(end) ?? '');
+          expect(target?.getAttribute('vertex'), `${idOf(edge)} ${end}`).toBe('1');
+        }
+      }
+      // Flow labels travel with their flow.
+      const labelled = [...model.flows, ...model.messageFlows].filter((flow) => flow.label).length;
+      expect(cells.filter((cell) => (cell.getAttribute('style') ?? '').startsWith('edgeLabel;'))).toHaveLength(labelled);
+
+      if (OUT) {
+        mkdirSync(OUT, { recursive: true });
+        writeFileSync(`${OUT}/${name.replace(/\s+/g, '-')}.drawio`, exportDrawio(model, layout, getTheme('color')));
+      }
+    });
+  }
+
+  it('marks each kind of step the way draw.io draws it', () => {
+    const { model } = normalizeModel(allSymbolsRaw);
+    const doc = wellFormed(exportDrawio(model, layoutProcess(model), getTheme('color')));
+    const style = (id: string): Record<string, string> => {
+      const object = [...doc.getElementsByTagName('object')].find((item) => item.getAttribute('id') === id);
+      return styleOf(object?.getElementsByTagName('mxCell')[0] as Element);
+    };
+    expect(style('t2')).toMatchObject({ shape: 'mxgraph.bpmn.task', taskMarker: 'user' });
+    expect(style('t1')).toMatchObject({ taskMarker: 'abstract' });
+    expect(style('t9')).toMatchObject({ isLoopSub: '1' });
+    expect(style('t10')).toMatchObject({ bpmnShapeType: 'call' });
+    expect(style('t11')).toMatchObject({ isLoopStandard: '1' });
+    expect(style('t12')).toMatchObject({ isLoopMultiSeq: '1' });
+    expect(style('t13')).toMatchObject({ isLoopMultiParallel: '1' });
+    expect(style('x')).toMatchObject({ shape: 'mxgraph.bpmn.gateway2', gwType: 'exclusive' });
+    expect(style('p')).toMatchObject({ gwType: 'parallel' });
+    expect(style('i')).toMatchObject({ outline: 'end', symbol: 'general' });
+    expect(style('eb')).toMatchObject({ outline: 'catching', symbol: 'multiple' });
+    expect(style('s')).toMatchObject({ shape: 'mxgraph.bpmn.event', outline: 'standard', symbol: 'timer' });
+    expect(style('c2')).toMatchObject({ outline: 'catching', symbol: 'message' });
+    expect(style('h3')).toMatchObject({ outline: 'throwing', symbol: 'escalation' });
+    expect(style('b1')).toMatchObject({ outline: 'boundInt', symbol: 'timer' });
+    expect(style('b3')).toMatchObject({ outline: 'boundNonint', symbol: 'message' });
+    expect(style('e0')).toMatchObject({ outline: 'end', symbol: 'terminate2' });
+    expect(style('e4')).toMatchObject({ outline: 'end', symbol: 'terminate' });
+    expect(style('e2')).toMatchObject({ outline: 'end', symbol: 'error' });
   });
 });

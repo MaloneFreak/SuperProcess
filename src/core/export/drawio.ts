@@ -73,7 +73,10 @@ function nodeStyle(node: ProcessNode, box: Box & { label: TextBlock | null }, th
 
   if (role === 'task') {
     return style({
-      shape: 'mxgraph.bpmn.task2',
+      // draw.io's palette now emits "mxgraph.bpmn.task2", which draws the same
+      // at this line width but is missing from older releases (20.2 of 2022
+      // shows a bare rectangle for it). Every release knows "task".
+      shape: 'mxgraph.bpmn.task',
       whiteSpace: 'wrap',
       rectStyle: 'rounded',
       size: 10,
