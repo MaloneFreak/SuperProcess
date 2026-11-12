@@ -1,11 +1,12 @@
 name: Deploy the web app to GitHub Pages
 
 # One-time setup: in the repository settings, open Pages and choose
-# "GitHub Actions" as the source.
+# "GitHub Actions" as the source. Until then this workflow does nothing.
+# After that it publishes every push to the default branch, whatever its
+# name, and it can be run by hand from the Actions tab.
 
 on:
   push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -14,11 +15,35 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  check:
+    name: Is GitHub Pages enabled?
+    if: github.event_name == 'workflow_dispatch' || github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.pages.outputs.enabled }}
+    steps:
+      - id: pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if out=$(gh api "repos/$GITHUB_REPOSITORY/pages" 2>&1); then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          elif echo "$out" | grep -q "HTTP 404"; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::GitHub Pages is not enabled for this repository yet. In the repository settings, open Pages, choose GitHub Actions as the source, then run this workflow again."
+          else
+            # Could not tell: go on, and let the deployment report what is wrong.
+            echo "$out"
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: check
+    if: needs.check.outputs.enabled == 'true'
     runs-on: ubuntu-latest
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'

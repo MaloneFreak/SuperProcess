@@ -155,9 +155,9 @@ Os testes unitários cobrem o modelo, o layout (nenhuma forma sobreposta, nenhum
 
 ## Publicação
 
-**App web.** Nas configurações do repositório, abra *Pages* e escolha *GitHub Actions* como origem. O workflow `Deploy the web app to GitHub Pages` passa a publicar cada push na `main`.
+**App web.** Nas configurações do repositório, abra *Pages* e escolha *GitHub Actions* como origem. O workflow `Deploy the web app to GitHub Pages` passa a publicar cada push na branch padrão. Para publicar na hora, abra a aba *Actions*, escolha esse workflow e clique em *Run workflow*.
 
-**Apps de desktop.** Envie uma tag como `v0.1.0`. O workflow `Build the desktop apps` gera o instalador e o `.exe` portátil para Windows, arquivos `.dmg` para macOS e AppImage e `.deb` para Linux, e os anexa a um rascunho de release. Os builds não são assinados digitalmente, então o SmartScreen do Windows e o Gatekeeper do macOS avisam na primeira abertura.
+**Apps de desktop.** Publique uma release no GitHub com uma tag nova, como `v0.1.0`. O workflow `Build the desktop apps` gera o instalador e o `.exe` portátil para Windows, arquivos `.dmg` para macOS e AppImage e `.deb` para Linux, e os anexa à release alguns minutos depois. (Enviar a tag pela linha de comando também funciona: os arquivos vão para um rascunho de release.) Os builds não são assinados digitalmente, então o SmartScreen do Windows e o Gatekeeper do macOS avisam na primeira abertura.
 
 ## Situação atual
 

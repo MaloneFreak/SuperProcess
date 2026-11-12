@@ -155,9 +155,9 @@ The unit tests cover the model, the layout (no overlapping shapes, no flow throu
 
 ## Deploying
 
-**Web app.** In the repository settings, open *Pages* and choose *GitHub Actions* as the source. The `Deploy the web app to GitHub Pages` workflow then publishes every push to `main`.
+**Web app.** In the repository settings, open *Pages* and choose *GitHub Actions* as the source. The `Deploy the web app to GitHub Pages` workflow then publishes every push to the default branch. To publish straight away, open the *Actions* tab, pick that workflow and choose *Run workflow*.
 
-**Desktop apps.** Push a tag such as `v0.1.0`. The `Build the desktop apps` workflow builds a Windows installer and portable `.exe`, macOS `.dmg` files and a Linux AppImage and `.deb`, and attaches them to a draft release. The builds are not code-signed, so Windows SmartScreen and macOS Gatekeeper warn on first launch.
+**Desktop apps.** Publish a release on GitHub with a new tag such as `v0.1.0`. The `Build the desktop apps` workflow builds a Windows installer and portable `.exe`, macOS `.dmg` files and a Linux AppImage and `.deb`, and attaches them to the release a few minutes later. (Pushing the tag from the command line works too: the files then go to a draft release.) The builds are not code-signed, so Windows SmartScreen and macOS Gatekeeper warn on first launch.
 
 ## Status
 

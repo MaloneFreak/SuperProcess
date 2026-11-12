@@ -1,8 +1,13 @@
 name: Build the desktop apps
 
-# Push a tag such as v0.1.0 to build installers and portable versions for
-# Windows, macOS and Linux and attach them to a draft GitHub release.
-# Run it manually to get the same files as workflow artifacts, without a release.
+# Builds installers and portable versions for Windows, macOS and Linux.
+#
+# - Publish a release on GitHub with a new tag such as v0.1.0: the files are
+#   attached to that release.
+# - Or push such a tag from the command line: the files go to a new draft
+#   release, to review and publish.
+# - Or run the workflow by hand: the files are kept as workflow artifacts,
+#   without a release.
 
 on:
   push:
@@ -43,7 +48,7 @@ jobs:
             release/*.deb
 
   release:
-    name: Create the draft release
+    name: Attach the files to the release
     needs: build
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
@@ -52,6 +57,11 @@ jobs:
         with:
           path: artifacts
           merge-multiple: true
-      - run: gh release create "$GITHUB_REF_NAME" artifacts/* --repo "$GITHUB_REPOSITORY" --draft --generate-notes --title "SuperProcess $GITHUB_REF_NAME"
-        env:
+      - env:
           GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" artifacts/* --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" artifacts/* --repo "$GITHUB_REPOSITORY" --draft --generate-notes --title "SuperProcess $GITHUB_REF_NAME"
+          fi
